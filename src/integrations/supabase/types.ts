@@ -14,7 +14,129 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      budgets: {
+        Row: {
+          category: Database["public"]["Enums"]["transaction_category"]
+          created_at: string
+          id: string
+          month: string
+          monthly_limit: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["transaction_category"]
+          created_at?: string
+          id?: string
+          month: string
+          monthly_limit: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["transaction_category"]
+          created_at?: string
+          id?: string
+          month?: string
+          monthly_limit?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          currency: Database["public"]["Enums"]["currency_code"]
+          display_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          display_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      savings_goals: {
+        Row: {
+          created_at: string
+          current_amount: number
+          id: string
+          name: string
+          target_amount: number
+          target_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_amount?: number
+          id?: string
+          name: string
+          target_amount: number
+          target_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_amount?: number
+          id?: string
+          name?: string
+          target_amount?: number
+          target_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["transaction_category"]
+          created_at: string
+          description: string | null
+          id: string
+          transaction_date: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: Database["public"]["Enums"]["transaction_category"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_date?: string
+          type: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["transaction_category"]
+          created_at?: string
+          description?: string | null
+          id?: string
+          transaction_date?: string
+          type?: Database["public"]["Enums"]["transaction_type"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +145,16 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      currency_code: "INR" | "USD" | "AED" | "EUR" | "GBP"
+      transaction_category:
+        | "food"
+        | "transport"
+        | "shopping"
+        | "bills"
+        | "entertainment"
+        | "salary"
+        | "other"
+      transaction_type: "income" | "expense"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +281,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      currency_code: ["INR", "USD", "AED", "EUR", "GBP"],
+      transaction_category: [
+        "food",
+        "transport",
+        "shopping",
+        "bills",
+        "entertainment",
+        "salary",
+        "other",
+      ],
+      transaction_type: ["income", "expense"],
+    },
   },
 } as const

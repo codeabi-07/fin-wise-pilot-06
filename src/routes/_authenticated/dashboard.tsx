@@ -145,12 +145,42 @@ function Dashboard() {
         <AddTransactionDialog onDone={() => qc.invalidateQueries({ queryKey: ["transactions"] })} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Current balance" value={formatMoney(stats.balance, currency)} icon={Wallet} tone="brand" />
-        <StatCard label="Total income" value={formatMoney(stats.income, currency)} icon={ArrowDownRight} tone="success" trend="+" />
-        <StatCard label="Total expenses" value={formatMoney(stats.expenses, currency)} icon={ArrowUpRight} tone="destructive" trend="-" />
-        <StatCard label="Savings" value={formatMoney(stats.savings, currency)} icon={PiggyBank} tone="accent" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Balance" value={formatMoney(stats.balance, currency)} icon={Wallet} tone="brand" />
+        <StatCard label="Net worth" value={formatMoney(stats.netWorth, currency)} icon={Landmark} tone="brand" />
+        <StatCard label="Income" value={formatMoney(stats.income, currency)} icon={ArrowDownRight} tone="success" trend="+" />
+        <StatCard label="Expenses" value={formatMoney(stats.expenses, currency)} icon={ArrowUpRight} tone="destructive" trend="-" />
+        <StatCard
+          label="Spend trend"
+          value={`${stats.trendPct >= 0 ? "+" : ""}${Math.round(stats.trendPct)}%`}
+          icon={TrendingUp}
+          tone={stats.trendPct > 10 ? "destructive" : "success"}
+        />
       </div>
+
+      {/* AI Insights */}
+      <Card className="relative overflow-hidden border-accent/30 shadow-elegant">
+        <div className="absolute inset-0 bg-gradient-mesh opacity-60" />
+        <CardContent className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-brand text-white shadow-glow">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-accent">AI Insight</p>
+              <Badge variant="outline" className="text-[10px]">Live</Badge>
+            </div>
+            <p className="mt-1 text-sm text-foreground/90">
+              {aiInsight.split(/\*\*(.*?)\*\*/g).map((chunk, i) => i % 2 === 1
+                ? <span key={i} className="font-semibold text-foreground">{chunk}</span>
+                : <span key={i}>{chunk}</span>)}
+            </p>
+          </div>
+          <Button asChild variant="outline" className="shrink-0 backdrop-blur">
+            <Link to="/assistant"><Sparkles className="mr-2 h-4 w-4" /> Ask coach</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-elegant">

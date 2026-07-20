@@ -57,15 +57,41 @@ function Dashboard() {
     },
   });
 
+  const { data: goals = [] } = useQuery({
+    queryKey: ["goals"],
+    queryFn: async () => {
+      const { data } = await supabase.from("savings_goals")
+        .select("id,name,target_amount,current_amount,target_date").order("created_at").limit(3);
+      return (data ?? []).map((g) => ({ ...g, target_amount: Number(g.target_amount), current_amount: Number(g.current_amount) }));
+    },
+  });
+
   const stats = useMemo(() => {
     const income = txs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expenses = txs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
     const balance = income - expenses;
     const savings = Math.max(balance, 0);
+    const savedInGoals = goals.reduce((s, g) => s + g.current_amount, 0);
+    const netWorth = balance + savedInGoals;
     const savingsRate = income > 0 ? savings / income : 0;
-    const health = Math.round(Math.min(100, Math.max(0, savingsRate * 100 * 0.7 + (balance > 0 ? 30 : 0))));
-    return { income, expenses, balance, savings, health };
-  }, [txs]);
+
+    const now = new Date();
+    const thisKey = now.toISOString().slice(0, 7);
+    const lastD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastKey = lastD.toISOString().slice(0, 7);
+    const thisSpend = txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === thisKey).reduce((s, t) => s + t.amount, 0);
+    const lastSpend = txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === lastKey).reduce((s, t) => s + t.amount, 0);
+    const trendPct = lastSpend > 0 ? ((thisSpend - lastSpend) / lastSpend) * 100 : 0;
+
+    // Predicted end-of-month based on avg daily this month
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const thisIncome = txs.filter((t) => t.type === "income" && t.transaction_date.slice(0, 7) === thisKey).reduce((s, t) => s + t.amount, 0);
+    const projectedNet = thisIncome - (thisSpend / Math.max(dayOfMonth, 1)) * daysInMonth;
+
+    const health = Math.round(Math.min(100, Math.max(0, savingsRate * 100 * 0.6 + (balance > 0 ? 25 : 0) + (goals.length > 0 ? 15 : 0))));
+    return { income, expenses, balance, savings, health, netWorth, thisSpend, lastSpend, trendPct, projectedNet };
+  }, [txs, goals]);
 
   const chartData = useMemo(() => {
     const map = new Map<string, { month: string; income: number; expenses: number }>();
@@ -82,6 +108,29 @@ function Dashboard() {
     });
     return Array.from(map.values());
   }, [txs]);
+
+  const categoryBreakdown = useMemo(() => {
+    const now = new Date().toISOString().slice(0, 7);
+    const map = new Map<Category, number>();
+    txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === now)
+      .forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount));
+    return CATEGORIES
+      .map((c) => ({ category: c, label: CATEGORY_META[c].label, value: map.get(c) ?? 0, color: CATEGORY_META[c].color }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [txs]);
+
+  const aiInsight = useMemo(() => {
+    if (txs.length === 0) return "Add a few transactions and I'll surface spending patterns and savings tips here.";
+    const top = categoryBreakdown[0];
+    const parts: string[] = [];
+    if (top) parts.push(`Your biggest expense this month is **${top.label}** at ${formatMoney(top.value, currency)}.`);
+    if (stats.trendPct > 10) parts.push(`Spending is up **${Math.round(stats.trendPct)}%** vs last month — worth a look.`);
+    else if (stats.trendPct < -10) parts.push(`Nice — spending is down **${Math.round(Math.abs(stats.trendPct))}%** vs last month.`);
+    if (stats.projectedNet > 0) parts.push(`On this trend you'll end the month with **${formatMoney(stats.projectedNet, currency)}** net.`);
+    else if (stats.projectedNet < 0) parts.push(`On this trend you'll be **${formatMoney(Math.abs(stats.projectedNet), currency)}** short this month.`);
+    return parts.join(" ");
+  }, [txs, categoryBreakdown, stats, currency]);
 
   return (
     <div className="space-y-8">

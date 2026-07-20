@@ -15,10 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
+  PieChart, Pie, Cell,
 } from "recharts";
 import { formatMoney, type CurrencyCode } from "@/lib/currency";
 import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/categories";
-import { ArrowDownRight, ArrowUpRight, Plus, TrendingUp, Wallet, PiggyBank, Activity } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Plus, TrendingUp, Wallet, PiggyBank, Activity, Sparkles, Target, Landmark } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({

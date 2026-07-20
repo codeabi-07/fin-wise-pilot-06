@@ -184,3 +184,8 @@
   background-clip: text;
   color: transparent;
 }
+@utility glass {
+  background-color: color-mix(in oklab, var(--color-card) 65%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--color-border) 70%, transparent);
+}

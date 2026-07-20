@@ -15,10 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import {
   Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid,
+  PieChart, Pie, Cell,
 } from "recharts";
 import { formatMoney, type CurrencyCode } from "@/lib/currency";
 import { CATEGORIES, CATEGORY_META, type Category } from "@/lib/categories";
-import { ArrowDownRight, ArrowUpRight, Plus, TrendingUp, Wallet, PiggyBank, Activity } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Plus, TrendingUp, Wallet, PiggyBank, Activity, Sparkles, Target, Landmark } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -55,15 +57,41 @@ function Dashboard() {
     },
   });
 
+  const { data: goals = [] } = useQuery({
+    queryKey: ["goals"],
+    queryFn: async () => {
+      const { data } = await supabase.from("savings_goals")
+        .select("id,name,target_amount,current_amount,target_date").order("created_at").limit(3);
+      return (data ?? []).map((g) => ({ ...g, target_amount: Number(g.target_amount), current_amount: Number(g.current_amount) }));
+    },
+  });
+
   const stats = useMemo(() => {
     const income = txs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expenses = txs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
     const balance = income - expenses;
     const savings = Math.max(balance, 0);
+    const savedInGoals = goals.reduce((s, g) => s + g.current_amount, 0);
+    const netWorth = balance + savedInGoals;
     const savingsRate = income > 0 ? savings / income : 0;
-    const health = Math.round(Math.min(100, Math.max(0, savingsRate * 100 * 0.7 + (balance > 0 ? 30 : 0))));
-    return { income, expenses, balance, savings, health };
-  }, [txs]);
+
+    const now = new Date();
+    const thisKey = now.toISOString().slice(0, 7);
+    const lastD = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastKey = lastD.toISOString().slice(0, 7);
+    const thisSpend = txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === thisKey).reduce((s, t) => s + t.amount, 0);
+    const lastSpend = txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === lastKey).reduce((s, t) => s + t.amount, 0);
+    const trendPct = lastSpend > 0 ? ((thisSpend - lastSpend) / lastSpend) * 100 : 0;
+
+    // Predicted end-of-month based on avg daily this month
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const thisIncome = txs.filter((t) => t.type === "income" && t.transaction_date.slice(0, 7) === thisKey).reduce((s, t) => s + t.amount, 0);
+    const projectedNet = thisIncome - (thisSpend / Math.max(dayOfMonth, 1)) * daysInMonth;
+
+    const health = Math.round(Math.min(100, Math.max(0, savingsRate * 100 * 0.6 + (balance > 0 ? 25 : 0) + (goals.length > 0 ? 15 : 0))));
+    return { income, expenses, balance, savings, health, netWorth, thisSpend, lastSpend, trendPct, projectedNet };
+  }, [txs, goals]);
 
   const chartData = useMemo(() => {
     const map = new Map<string, { month: string; income: number; expenses: number }>();
@@ -81,6 +109,29 @@ function Dashboard() {
     return Array.from(map.values());
   }, [txs]);
 
+  const categoryBreakdown = useMemo(() => {
+    const now = new Date().toISOString().slice(0, 7);
+    const map = new Map<Category, number>();
+    txs.filter((t) => t.type === "expense" && t.transaction_date.slice(0, 7) === now)
+      .forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount));
+    return CATEGORIES
+      .map((c) => ({ category: c, label: CATEGORY_META[c].label, value: map.get(c) ?? 0, color: CATEGORY_META[c].color }))
+      .filter((r) => r.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [txs]);
+
+  const aiInsight = useMemo(() => {
+    if (txs.length === 0) return "Add a few transactions and I'll surface spending patterns and savings tips here.";
+    const top = categoryBreakdown[0];
+    const parts: string[] = [];
+    if (top) parts.push(`Your biggest expense this month is **${top.label}** at ${formatMoney(top.value, currency)}.`);
+    if (stats.trendPct > 10) parts.push(`Spending is up **${Math.round(stats.trendPct)}%** vs last month — worth a look.`);
+    else if (stats.trendPct < -10) parts.push(`Nice — spending is down **${Math.round(Math.abs(stats.trendPct))}%** vs last month.`);
+    if (stats.projectedNet > 0) parts.push(`On this trend you'll end the month with **${formatMoney(stats.projectedNet, currency)}** net.`);
+    else if (stats.projectedNet < 0) parts.push(`On this trend you'll be **${formatMoney(Math.abs(stats.projectedNet), currency)}** short this month.`);
+    return parts.join(" ");
+  }, [txs, categoryBreakdown, stats, currency]);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -94,12 +145,42 @@ function Dashboard() {
         <AddTransactionDialog onDone={() => qc.invalidateQueries({ queryKey: ["transactions"] })} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Current balance" value={formatMoney(stats.balance, currency)} icon={Wallet} tone="brand" />
-        <StatCard label="Total income" value={formatMoney(stats.income, currency)} icon={ArrowDownRight} tone="success" trend="+" />
-        <StatCard label="Total expenses" value={formatMoney(stats.expenses, currency)} icon={ArrowUpRight} tone="destructive" trend="-" />
-        <StatCard label="Savings" value={formatMoney(stats.savings, currency)} icon={PiggyBank} tone="accent" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <StatCard label="Balance" value={formatMoney(stats.balance, currency)} icon={Wallet} tone="brand" />
+        <StatCard label="Net worth" value={formatMoney(stats.netWorth, currency)} icon={Landmark} tone="brand" />
+        <StatCard label="Income" value={formatMoney(stats.income, currency)} icon={ArrowDownRight} tone="success" trend="+" />
+        <StatCard label="Expenses" value={formatMoney(stats.expenses, currency)} icon={ArrowUpRight} tone="destructive" trend="-" />
+        <StatCard
+          label="Spend trend"
+          value={`${stats.trendPct >= 0 ? "+" : ""}${Math.round(stats.trendPct)}%`}
+          icon={TrendingUp}
+          tone={stats.trendPct > 10 ? "destructive" : "success"}
+        />
       </div>
+
+      {/* AI Insights */}
+      <Card className="relative overflow-hidden border-accent/30 shadow-elegant">
+        <div className="absolute inset-0 bg-gradient-mesh opacity-60" />
+        <CardContent className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-brand text-white shadow-glow">
+            <Sparkles className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="font-display text-sm font-semibold uppercase tracking-wider text-accent">AI Insight</p>
+              <Badge variant="outline" className="text-[10px]">Live</Badge>
+            </div>
+            <p className="mt-1 text-sm text-foreground/90">
+              {aiInsight.split(/\*\*(.*?)\*\*/g).map((chunk, i) => i % 2 === 1
+                ? <span key={i} className="font-semibold text-foreground">{chunk}</span>
+                : <span key={i}>{chunk}</span>)}
+            </p>
+          </div>
+          <Button asChild variant="outline" className="shrink-0 backdrop-blur">
+            <Link to="/assistant"><Sparkles className="mr-2 h-4 w-4" /> Ask coach</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2 shadow-elegant">
@@ -176,6 +257,83 @@ function Dashboard() {
               </div>
               <Progress value={stats.income > 0 ? (stats.savings / stats.income) * 100 : 0} />
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Category Breakdown + Goals */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2 shadow-elegant">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><PiggyBank className="h-4 w-4 text-accent" /> Category breakdown</CardTitle>
+            <CardDescription>Where your money went this month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {categoryBreakdown.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">No expenses yet this month.</div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-center">
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={categoryBreakdown} dataKey="value" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                        {categoryBreakdown.map((c) => <Cell key={c.category} fill={c.color} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 12 }}
+                        formatter={(v: number) => formatMoney(v, currency)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2">
+                  {categoryBreakdown.slice(0, 5).map((c) => {
+                    const total = categoryBreakdown.reduce((s, r) => s + r.value, 0);
+                    const pct = total > 0 ? (c.value / total) * 100 : 0;
+                    return (
+                      <div key={c.category} className="flex items-center gap-3">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color }} />
+                        <span className="flex-1 text-sm">{c.label}</span>
+                        <span className="text-xs text-muted-foreground">{Math.round(pct)}%</span>
+                        <span className="w-24 text-right text-sm font-medium">{formatMoney(c.value, currency)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-elegant">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Target className="h-4 w-4 text-accent" /> Savings goals</CardTitle>
+              <CardDescription>Top {Math.min(3, goals.length || 3)} goals</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm"><Link to="/budgets">Manage</Link></Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {goals.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No goals yet. <Link to="/budgets" className="text-accent underline">Create one</Link> to start tracking.
+              </div>
+            ) : goals.map((g) => {
+              const pct = g.target_amount > 0 ? Math.min(100, (g.current_amount / g.target_amount) * 100) : 0;
+              return (
+                <div key={g.id}>
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate font-medium">{g.name}</span>
+                    <span className="text-muted-foreground">{Math.round(pct)}%</span>
+                  </div>
+                  <Progress value={pct} className="mt-1.5" />
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                    <span>{formatMoney(g.current_amount, currency)}</span>
+                    <span>{formatMoney(g.target_amount, currency)}</span>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

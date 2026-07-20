@@ -261,6 +261,83 @@ function Dashboard() {
         </Card>
       </div>
 
+      {/* Category Breakdown + Goals */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-2 shadow-elegant">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><PiggyBank className="h-4 w-4 text-accent" /> Category breakdown</CardTitle>
+            <CardDescription>Where your money went this month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {categoryBreakdown.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">No expenses yet this month.</div>
+            ) : (
+              <div className="grid gap-6 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-center">
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={categoryBreakdown} dataKey="value" nameKey="label" innerRadius={55} outerRadius={85} paddingAngle={2}>
+                        {categoryBreakdown.map((c) => <Cell key={c.category} fill={c.color} />)}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 12 }}
+                        formatter={(v: number) => formatMoney(v, currency)}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2">
+                  {categoryBreakdown.slice(0, 5).map((c) => {
+                    const total = categoryBreakdown.reduce((s, r) => s + r.value, 0);
+                    const pct = total > 0 ? (c.value / total) * 100 : 0;
+                    return (
+                      <div key={c.category} className="flex items-center gap-3">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color }} />
+                        <span className="flex-1 text-sm">{c.label}</span>
+                        <span className="text-xs text-muted-foreground">{Math.round(pct)}%</span>
+                        <span className="w-24 text-right text-sm font-medium">{formatMoney(c.value, currency)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-elegant">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Target className="h-4 w-4 text-accent" /> Savings goals</CardTitle>
+              <CardDescription>Top {Math.min(3, goals.length || 3)} goals</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm"><Link to="/budgets">Manage</Link></Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {goals.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No goals yet. <Link to="/budgets" className="text-accent underline">Create one</Link> to start tracking.
+              </div>
+            ) : goals.map((g) => {
+              const pct = g.target_amount > 0 ? Math.min(100, (g.current_amount / g.target_amount) * 100) : 0;
+              return (
+                <div key={g.id}>
+                  <div className="flex justify-between text-sm">
+                    <span className="truncate font-medium">{g.name}</span>
+                    <span className="text-muted-foreground">{Math.round(pct)}%</span>
+                  </div>
+                  <Progress value={pct} className="mt-1.5" />
+                  <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                    <span>{formatMoney(g.current_amount, currency)}</span>
+                    <span>{formatMoney(g.target_amount, currency)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="shadow-elegant">
         <CardHeader>
           <CardTitle>Recent transactions</CardTitle>

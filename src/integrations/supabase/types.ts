@@ -44,12 +44,59 @@ export type Database = {
         }
         Relationships: []
       }
+      goal_contributions: {
+        Row: {
+          amount: number
+          contributed_on: string
+          created_at: string
+          goal_id: string
+          id: string
+          user_id: string
+          wallet_id: string | null
+        }
+        Insert: {
+          amount: number
+          contributed_on?: string
+          created_at?: string
+          goal_id: string
+          id?: string
+          user_id: string
+          wallet_id?: string | null
+        }
+        Update: {
+          amount?: number
+          contributed_on?: string
+          created_at?: string
+          goal_id?: string
+          id?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goal_contributions_goal_id_fkey"
+            columns: ["goal_id"]
+            isOneToOne: false
+            referencedRelation: "savings_goals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goal_contributions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
           currency: Database["public"]["Enums"]["currency_code"]
           display_name: string | null
           id: string
+          monthly_income: number | null
+          salary_day: number | null
           updated_at: string
         }
         Insert: {
@@ -57,6 +104,8 @@ export type Database = {
           currency?: Database["public"]["Enums"]["currency_code"]
           display_name?: string | null
           id: string
+          monthly_income?: number | null
+          salary_day?: number | null
           updated_at?: string
         }
         Update: {
@@ -64,6 +113,8 @@ export type Database = {
           currency?: Database["public"]["Enums"]["currency_code"]
           display_name?: string | null
           id?: string
+          monthly_income?: number | null
+          salary_day?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -108,10 +159,12 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          purpose: string | null
           transaction_date: string
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at: string
           user_id: string
+          wallet_id: string | null
         }
         Insert: {
           amount: number
@@ -119,10 +172,12 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          purpose?: string | null
           transaction_date?: string
           type: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
           user_id: string
+          wallet_id?: string | null
         }
         Update: {
           amount?: number
@@ -130,9 +185,46 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          purpose?: string | null
           transaction_date?: string
           type?: Database["public"]["Enums"]["transaction_type"]
           updated_at?: string
+          user_id?: string
+          wallet_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          opening_balance: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: string
+          name: string
+          opening_balance?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          opening_balance?: number
           user_id?: string
         }
         Relationships: []
